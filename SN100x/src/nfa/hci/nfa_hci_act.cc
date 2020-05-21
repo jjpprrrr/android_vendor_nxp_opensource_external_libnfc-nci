@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 /******************************************************************************
@@ -43,6 +43,7 @@
 
 #include <android-base/stringprintf.h>
 #include <base/logging.h>
+#include <log/log.h>
 
 #include "nfa_dm_int.h"
 #include "nfa_hci_api.h"
@@ -314,7 +315,7 @@ static void nfa_hci_api_register(tNFA_HCI_EVENT_DATA* p_evt_data) {
       if (nfa_hci_cb.cfg.reg_app_names[xx][0] == 0) {
         memset(&nfa_hci_cb.cfg.reg_app_names[xx][0], 0,
                sizeof(nfa_hci_cb.cfg.reg_app_names[xx]));
-        NQ_STRLCPY_S (&nfa_hci_cb.cfg.reg_app_names[xx][0], sizeof (nfa_hci_cb.cfg.reg_app_names[xx]), p_app_name,
+        strlcpy(&nfa_hci_cb.cfg.reg_app_names[xx][0], p_app_name,
                 NFA_MAX_HCI_APP_NAME_LEN);
         nfa_hci_cb.nv_write_needed = true;
         DLOG_IF(INFO, nfc_debug_enabled) << StringPrintf(
@@ -1562,8 +1563,9 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
         } else if (nfa_hci_cb.param_in_use == NFA_HCI_SESSION_IDENTITY_INDEX) {
           /* The only parameter we get when initializing is the session ID.
            * Check for match. */
-          if (!memcmp((uint8_t*)nfa_hci_cb.cfg.admin_gate.session_id, p_data,
-                      NFA_HCI_SESSION_ID_LEN)) {
+          if (data_len >= NFA_HCI_SESSION_ID_LEN &&
+              !memcmp((uint8_t*)nfa_hci_cb.cfg.admin_gate.session_id, p_data,
+                NFA_HCI_SESSION_ID_LEN)) {
             /* Session has not changed, Set WHITELIST */
             nfa_hciu_send_set_param_cmd(
                 NFA_HCI_ADMIN_PIPE, NFA_HCI_WHITELIST_INDEX,
@@ -1572,7 +1574,10 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
             /* Something wrong, NVRAM data could be corrupt or first start with
              * default session id */
             nfa_hciu_send_clear_all_pipe_cmd();
-            nfa_hci_cb.b_hci_netwk_reset = true;
+            nfa_hci_cb.b_hci_new_sessionId = true;
+            if (data_len < NFA_HCI_SESSION_ID_LEN) {
+              android_errorWriteLog(0x534e4554, "124524315");
+            }
           }
         }
         break;
@@ -1581,7 +1586,14 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
         nfa_hci_cb.cfg.admin_gate.pipe01_state = NFA_HCI_PIPE_OPENED;
 
         if (nfa_hci_cb.b_hci_netwk_reset) {
+          /* Something wrong, NVRAM data could be corrupt or first start with
+           * default session id */
+          nfa_hciu_send_clear_all_pipe_cmd();
           nfa_hci_cb.b_hci_netwk_reset = false;
+          nfa_hci_cb.b_hci_new_sessionId = true;
+        } else if (nfa_hci_cb.b_hci_new_sessionId) {
+          nfa_hci_cb.b_hci_new_sessionId = false;
+
           /* Session ID is reset, Set New session id */
           memcpy(
               &nfa_hci_cb.cfg.admin_gate.session_id[NFA_HCI_SESSION_ID_LEN / 2],
@@ -1651,8 +1663,9 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
 
       case NFA_HCI_ANY_GET_PARAMETER:
         if (nfa_hci_cb.param_in_use == NFA_HCI_SESSION_IDENTITY_INDEX) {
-          if (!memcmp((uint8_t*)default_session, p_data,
-                      NFA_HCI_SESSION_ID_LEN)) {
+          if (data_len >= NFA_HCI_SESSION_ID_LEN &&
+              !memcmp((uint8_t*)default_session, p_data,
+                NFA_HCI_SESSION_ID_LEN)) {
             memcpy(&nfa_hci_cb.cfg.admin_gate
                         .session_id[(NFA_HCI_SESSION_ID_LEN / 2)],
                    nfa_hci_cb.cfg.admin_gate.session_id,
@@ -1666,6 +1679,9 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
                 NFA_HCI_SESSION_ID_LEN,
                 (uint8_t*)nfa_hci_cb.cfg.admin_gate.session_id);
           } else {
+            if (data_len < NFA_HCI_SESSION_ID_LEN) {
+              android_errorWriteLog(0x534e4554, "124524315");
+            }
             if (nfa_hci_cb.hci_state == NFA_HCI_STATE_APP_DEREGISTER)
               nfa_hci_api_deregister(nullptr);
             else if (nfa_hci_cb.hci_state == NFA_HCI_STATE_REMOVE_GATE)
@@ -1673,6 +1689,10 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
           }
         } else if (nfa_hci_cb.param_in_use == NFA_HCI_HOST_LIST_INDEX) {
           evt_data.hosts.status = status;
+          if (data_len > NFA_HCI_MAX_HOST_IN_NETWORK) {
+            data_len = NFA_HCI_MAX_HOST_IN_NETWORK;
+            android_errorWriteLog(0x534e4554, "124524315");
+          }
           evt_data.hosts.num_hosts = data_len;
           memcpy(evt_data.hosts.host, p_data, data_len);
 #if(NXP_EXTNS == TRUE)
@@ -1707,7 +1727,8 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
         break;
 
       case NFA_HCI_ADM_CREATE_PIPE:
-        if (status == NFA_STATUS_OK) {
+        // p_data should have at least 5 bytes length for pipe info
+        if (data_len >= 5 && status == NFA_STATUS_OK) {
           STREAM_TO_UINT8(source_host, p_data);
           STREAM_TO_UINT8(source_gate, p_data);
           STREAM_TO_UINT8(dest_host, p_data);
@@ -1724,6 +1745,9 @@ void nfa_hci_handle_admin_gate_rsp(uint8_t* p_data, uint8_t data_len) {
           }
 
           nfa_hciu_add_pipe_to_gate(pipe, source_gate, dest_host, dest_gate);
+        } else if (data_len < 5 && status == NFA_STATUS_OK) {
+          android_errorWriteLog(0x534e4554, "124524315");
+          status = NFA_STATUS_FAILED;
         }
 
         /* Tell the application his pipe was created or not */
@@ -2583,8 +2607,9 @@ static bool nfa_hci_set_apdu_pipe_ready_for_host (uint8_t host_id)
         else
         {
             /* ID Management Pipe in open state */
-            if ((p_apdu_pipe = nfa_hciu_find_dyn_apdu_pipe_for_host (host_id)) == nullptr ||
-                    (p_conn_pipe = nfa_hciu_find_dyn_conn_pipe_for_host (host_id)) == nullptr)
+            if (((p_apdu_pipe = nfa_hciu_find_dyn_apdu_pipe_for_host (host_id)) == nullptr &&
+                    nfa_hci_cb.se_apdu_gate_support) || ((p_conn_pipe =
+                            nfa_hciu_find_dyn_conn_pipe_for_host (host_id)) == nullptr))
             {
                 /* No APDU Pipe, Check if APDU gate or General Purpose APDU gate exist */
                 gate_id = nfa_hciu_find_server_apdu_gate_for_host (host_id);
@@ -2612,12 +2637,15 @@ static bool nfa_hci_set_apdu_pipe_ready_for_host (uint8_t host_id)
             else
             {
                 /* APDU Pipe exist */
-                if (p_apdu_pipe->pipe_state == NFA_HCI_PIPE_CLOSED)
+                if ((p_apdu_pipe != nullptr) && (p_apdu_pipe->pipe_state
+                        == NFA_HCI_PIPE_CLOSED))
                 {
                     nfa_hciu_send_open_pipe_cmd (p_apdu_pipe->pipe_id);
                 }
                 else
                 {
+                    DLOG_IF(INFO, nfc_debug_enabled)
+                            << StringPrintf("%s : APDU gate info not available", __func__);
                     return false;
                 }
             }
@@ -2687,12 +2715,15 @@ bool nfa_hci_check_set_apdu_pipe_ready_for_next_host ()
     for(xx = 0; xx < NFA_HCI_MAX_HOST_IN_NETWORK; xx++) {
         p_host = &nfa_hci_cb.cfg.host[xx];
         uint8_t nfcee = nfa_hciu_get_hci_host_id(nfa_hci_cb.curr_nfcee);
-        LOG(ERROR) << StringPrintf("after updating uicc id%x", nfcee);
+        LOG(ERROR) << StringPrintf("after updating NFCEE id %x", nfcee);
         if (nfcee == p_host->host_id) {
             nfa_hciu_clear_host_resetting(p_host->host_id, NFCEE_HCI_NOTIFY_ALL_PIPE_CLEARED);
-            if(p_host->host_id == NFA_HCI_FIRST_PROP_HOST)
+            if (p_host->host_id == NFA_HCI_FIRST_PROP_HOST) {
               nfa_hci_api_add_prop_host_info();
-            done = nfa_hci_set_apdu_pipe_ready_for_host (p_host->host_id);
+              done = nfa_hci_set_apdu_pipe_ready_for_host(p_host->host_id);
+            } else {
+              done = false;
+            }
             break;
         }
     }

@@ -30,7 +30,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 /******************************************************************************
@@ -1447,8 +1447,10 @@ static tNFA_STATUS nfa_dm_disc_notify_activation(tNFC_DISCOVER* p_data) {
    * 1. Pass this info to JNI as START_READER_EVT.
    * return (NFA_STATUS_OK)
    */
-  if (p_data->activate.intf_param.type == nfcFL.nfcMwFL._NCI_INTERFACE_UICC_DIRECT ||
-      p_data->activate.intf_param.type == nfcFL.nfcMwFL._NCI_INTERFACE_ESE_DIRECT) {
+  if (IS_SCR_ON &&
+      (p_data->activate.intf_param.type == NCI_INTERFACE_FIRST_VS ||
+       p_data->activate.intf_param.type == nfcFL.nfcMwFL._NCI_INTERFACE_UICC_DIRECT ||
+       p_data->activate.intf_param.type == nfcFL.nfcMwFL._NCI_INTERFACE_ESE_DIRECT)) {
     for (xx = 0; xx < NFA_DM_DISC_NUM_ENTRIES; xx++) {
       if ((nfa_dm_cb.disc_cb.entry[xx].in_use)) {
         nfa_dm_cb.disc_cb.activated_rf_interface =
@@ -2450,6 +2452,9 @@ static void nfa_dm_disc_sm_poll_active(tNFA_DM_RF_DISC_SM_EVENT event,
       }
       if (p_data->nfc_discover.deactivate.reason !=
           NFC_DEACTIVATE_REASON_DH_REQ_FAILED) {
+        /* count for number of times deactivate cmd sent */
+        nfa_dm_cb.deactivate_cmd_retry_count = 0;
+
         sleep_wakeup_event = true;
         nfa_dm_disc_notify_deactivation(NFA_DM_RF_DEACTIVATE_NTF,
                                         &(p_data->nfc_discover));
@@ -2459,8 +2464,7 @@ static void nfa_dm_disc_sm_poll_active(tNFA_DM_RF_DISC_SM_EVENT event,
            NFC_DEACTIVATE_TYPE_SLEEP_AF)) {
         if (p_data->nfc_discover.deactivate.reason !=
             NFC_DEACTIVATE_REASON_DH_REQ_FAILED) {
-          /* count for number of times deactivate cmd sent */
-          nfa_dm_cb.deactivate_cmd_retry_count = 0;
+
           nfa_dm_disc_new_state(NFA_DM_RFST_W4_HOST_SELECT);
 #if (NXP_EXTNS == TRUE)
           if (nfa_dm_cb.disc_cb.disc_flags & NFA_DM_DISC_FLAGS_STOPPING) {
@@ -2516,7 +2520,6 @@ static void nfa_dm_disc_sm_poll_active(tNFA_DM_RF_DISC_SM_EVENT event,
                 (!nfa_dm_cb.disc_cb.deact_pending)) {
               nfa_dm_send_deactivate_cmd(NFA_DEACTIVATE_TYPE_DISCOVERY);
             }
-            nfa_dm_cb.deactivate_cmd_retry_count = 0;
           } else {
             nfa_dm_cb.deactivate_cmd_retry_count++;
             nfa_dm_send_deactivate_cmd(p_data->nfc_discover.deactivate.type);
@@ -2529,6 +2532,18 @@ static void nfa_dm_disc_sm_poll_active(tNFA_DM_RF_DISC_SM_EVENT event,
       } else if (p_data->nfc_discover.deactivate.type ==
                  NFC_DEACTIVATE_TYPE_DISCOVERY) {
         nfa_dm_disc_new_state(NFA_DM_RFST_DISCOVERY);
+        /* If deactivation type is discovery, reset the counter and notify
+         * upper layer.
+         */
+        nfa_dm_cb.deactivate_cmd_retry_count = 0;
+        DLOG_IF(INFO, nfc_debug_enabled)
+            << __func__
+            << StringPrintf("NFA_DM_RF_DEACTIVATE_NTF to discovery");
+        if (p_data->nfc_discover.deactivate.reason ==
+            NFC_DEACTIVATE_REASON_DH_REQ_FAILED) {
+          nfa_dm_disc_notify_deactivation(NFA_DM_RF_DEACTIVATE_NTF,
+                                          &(p_data->nfc_discover));
+        }
         if (nfa_dm_cb.disc_cb.disc_flags & NFA_DM_DISC_FLAGS_STOPPING) {
 #if (NXP_EXTNS == TRUE)
           /* Take care of  deact_pending request during presence check*/
@@ -3161,7 +3176,8 @@ bool nfa_dm_p2p_prio_logic(uint8_t event, uint8_t* p, uint8_t event_type) {
     return true;
   }
 #if (NXP_EXTNS == TRUE)
-  if (true == is_emvco_active) {
+  if (true == is_emvco_active ||
+      ((nfa_ee_cb.ee_flags & NFA_EE_FLAG_RECOVERY) == NFA_EE_FLAG_RECOVERY)) {
     DLOG_IF(INFO, nfc_debug_enabled) << StringPrintf(
         "returning from nfa_dm_p2p_prio_logic  reconnect_in_progress");
     return true;

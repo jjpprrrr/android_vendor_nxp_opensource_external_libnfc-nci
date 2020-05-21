@@ -15,7 +15,7 @@
  */
 /******************************************************************************
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ namespace {
 bool parseBytesString(std::string in, std::vector<uint8_t>& out) {
   vector<string> values = Split(in, ":");
   if (values.size() == 0) return false;
-  for (const string value : values) {
+  for (const string& value : values) {
     if (value.length() != 2) return false;
     uint8_t tmp = 0;
     string hexified = "0x";

@@ -30,7 +30,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 #pragma once
@@ -47,6 +47,7 @@
 #define NAME_POLLING_TECH_MASK "POLLING_TECH_MASK"
 #define NAME_P2P_LISTEN_TECH_MASK "P2P_LISTEN_TECH_MASK"
 #define NAME_UICC_LISTEN_TECH_MASK "UICC_LISTEN_TECH_MASK"
+#define NAME_HOST_LISTEN_TECH_MASK "HOST_LISTEN_TECH_MASK"
 #define NAME_NFA_DM_CFG "NFA_DM_CFG"
 #define NAME_SCREEN_OFF_POWER_STATE "SCREEN_OFF_POWER_STATE"
 #define NAME_NFA_MAX_EE_SUPPORTED "NFA_MAX_EE_SUPPORTED"
@@ -125,6 +126,7 @@
 #define NAME_OFF_HOST_SIM2_PIPE_ID "OFF_HOST_SIM2_PIPE_ID"
 #define NAME_NXP_ENABLE_DISABLE_LOGS "NXP_ENABLE_DISABLE_LOGS"
 #define NAME_NXP_RDR_REQ_GUARD_TIME "NXP_RDR_REQ_GUARD_TIME"
+#define NAME_NXP_RDR_DISABLE_ENABLE_LPCD "NXP_RDR_DISABLE_ENABLE_LPCD"
 
 #endif
 

@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2019 NXP
+ *  Copyright 2019-2020 NXP
  *
  ******************************************************************************/
 #include <errno.h>
@@ -140,8 +140,6 @@ void* gki_task_entry(void* params) {
 void GKI_init(void) {
   pthread_mutexattr_t attr;
   tGKI_OS* p_os;
-
-  memset(&gki_cb, 0, sizeof(gki_cb));
 
   gki_buffer_init();
   gki_timers_init();
