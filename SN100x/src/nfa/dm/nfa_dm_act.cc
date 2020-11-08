@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 /******************************************************************************
@@ -55,9 +55,6 @@
 #if (NFC_NFCEE_INCLUDED == TRUE)
 #include "nfa_ee_int.h"
 #include "nfc_int.h"
-#ifdef ENABLE_ESE_CLIENT
-#include "hal_nxpese.h"
-#endif
 #if (NXP_EXTNS == TRUE)
 #include "nfa_scr_int.h"
 #endif
@@ -427,6 +424,9 @@ static void nfa_dm_nfc_response_cback(tNFC_RESPONSE_EVT event,
       break;
 
     case NFC_GEN_ERROR_REVT: /* generic error command or notification */
+#if(NXP_EXTNS == TRUE)
+      if(p_data) NFA_SCR_PROCESS_EVT(NFA_SCR_MULTIPLE_TARGET_DETECTED_EVT, p_data->status);
+#endif
       break;
 
     case NFC_NFCC_RESTART_REVT: /* NFCC has been re-initialized */
@@ -554,7 +554,7 @@ bool nfa_dm_disable(tNFA_DM_MSG* p_data) {
                         NFA_DM_DISABLE_TIMEOUT_VAL);
   }
 #if (NXP_EXTNS == TRUE)
-  nfa_t4tnfcee_deinit();
+    nfa_t4tnfcee_deinit();
 #endif
   /* Disable all subsystems other than DM (DM will be disabled after all  */
   /* the other subsystem have been disabled)                              */
@@ -688,8 +688,7 @@ bool nfa_dm_set_power_sub_state(tNFA_DM_MSG* p_data) {
 void nfa_dm_conn_cback_event_notify(uint8_t event, tNFA_CONN_EVT_DATA* p_data) {
 
 #if(NXP_EXTNS == TRUE)
-  if (p_data)
-    NFA_SCR_PROCESS_EVT(event, p_data->status);
+  if (p_data) NFA_SCR_PROCESS_EVT(event, p_data->status);
 #endif
   if (nfa_dm_cb.flags & NFA_DM_FLAGS_EXCL_RF_ACTIVE) {
     /* Use exclusive RF mode callback */
@@ -1215,16 +1214,11 @@ bool nfa_dm_act_change_discovery_tech (tNFA_DM_MSG *p_data)
 *******************************************************************************/
 bool nfa_dm_set_transit_config(tNFA_DM_MSG* p_data) {
   DLOG_IF(INFO, nfc_debug_enabled) << StringPrintf("%s", __func__);
-  nfc_nci_IoctlInOutData_t inpOutData;
+
   tNFA_DM_CBACK_DATA dm_cback_data;
   dm_cback_data.set_transit_config.status = NFA_STATUS_OK;
 
-  inpOutData.inp.data.transitConfig.val =
-      p_data->transit_config.transitConfig;
-  /* size including the null char */
-  inpOutData.inp.data.transitConfig.len =
-      strlen(p_data->transit_config.transitConfig) + 1;
-  nfc_cb.p_hal->ioctl(HAL_NFC_IOCTL_SET_TRANSIT_CONFIG, (void*)&inpOutData);
+  nfc_cb.p_hal->set_transit_config(p_data->transit_config.transitConfig);
   (*nfa_dm_cb.p_dm_cback)(NFA_DM_SET_TRANSIT_CONFIG_EVT, &dm_cback_data);
 
   return true;
@@ -1356,7 +1350,10 @@ bool nfa_dm_act_start_rf_discovery(__attribute__((unused))
 
   DLOG_IF(INFO, nfc_debug_enabled) << __func__;
 
-  if (nfa_dm_cb.disc_cb.disc_flags & NFA_DM_DISC_FLAGS_ENABLED) {
+  if (nfa_dm_cb.disc_cb.disc_flags & NFA_DM_DISC_FLAGS_ENABLED ||
+      ((nfa_ee_cb.ee_flags & NFA_EE_FLAG_RECOVERY) == NFA_EE_FLAG_RECOVERY)) {
+    LOG(ERROR) << StringPrintf("Discovery start not required");
+
     evt_data.status = NFA_STATUS_OK;
     nfa_dm_conn_cback_event_notify(NFA_RF_DISCOVERY_STARTED_EVT, &evt_data);
   } else if (nfa_dm_cb.disc_cb.disc_state != NFA_DM_RFST_IDLE) {

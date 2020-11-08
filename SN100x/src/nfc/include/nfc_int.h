@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 /******************************************************************************
@@ -273,6 +273,8 @@ typedef struct {
   uint8_t rf_update_reqd;
 } tNFC_FWUpdate_Info_t;
 #endif
+
+#define HAL_NFC_FW_UPDATE_STATUS_EVT 0xA
 /*****************************************************************************
 **  EXTERNAL FUNCTION DECLARATIONS
 *****************************************************************************/

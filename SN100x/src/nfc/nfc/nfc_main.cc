@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 
@@ -97,6 +97,9 @@ extern void delete_stack_non_volatile_store(bool forceDelete);
 tNFC_CB nfc_cb;
 #if (NXP_EXTNS == TRUE)
 #define NFC_NCI_CREDIT_NTF_TOUT 2
+/* Refused status sent by HAL to restart NFC service */
+#define HAL_NFC_STATUS_RESTART HAL_NFC_STATUS_REFUSED
+
 extern uint8_t nfa_ee_max_ee_cfg;
 extern std::string nfc_storage_path;
 tNfc_featureList nfcFL;
@@ -674,19 +677,14 @@ static void nfc_main_hal_cback(uint8_t event, tHAL_NFC_STATUS status) {
 #endif
       }
 #if (NXP_EXTNS == TRUE)
-      else if(status == HAL_NFC_STATUS_RESTART)
-      {
+      /* Updates completed, restart NFC service */
+      else if (status == HAL_NFC_STATUS_RESTART) {
         DLOG_IF(INFO, nfc_debug_enabled)
-          << StringPrintf("ESE Update complete : Restart NFC service");
+            << StringPrintf("Restart NFC service");
         abort();
       }
-      else if(status == HAL_NFC_HCI_NV_RESET)
-      {
-        DLOG_IF(INFO, nfc_debug_enabled)
-          << StringPrintf("Jcop Update complete : Reset HCI NV info");
-        delete_stack_non_volatile_store(true);
-      }
 #endif
+
       break;
 
     case HAL_NFC_CLOSE_CPLT_EVT:
@@ -864,7 +862,7 @@ void NFC_Init(tHAL_NFC_ENTRY* p_hal_entry_tbl) {
   {
     nfc_cb.nci_credit_ntf_timeout = NFC_NCI_CREDIT_NTF_TOUT;
   }
-  if (NfcAdaptation::GetInstance().NFA_GetBootMode() != NFC_FAST_BOOT_MODE) {
+  if (NfcAdaptation::GetInstance().NFA_GetBootMode() == NFC_NORMAL_BOOT_MODE) {
 #endif
   rw_init();
   ce_init();

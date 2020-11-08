@@ -1,10 +1,10 @@
 /******************************************************************************
  *
- *  Copyright 2018 NXP
+ *  Copyright 2019 Google, Inc.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ *  You may obtain a copy of the License at:
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,19 +15,7 @@
  *  limitations under the License.
  *
  ******************************************************************************/
-package vendor.nxp.nxpnfc@1.0;
 
-interface INxpNfc {
-    /*
-     * Performs an General Input Output operations.
-     *
-     * Based on the ioctlType, input data bytes are processed and
-     * Output data bytes are generated.
-     * @param ioctlType contains type of functionality as below
-     *         HAL_NFC_IOCTL_SPI_DWP_SYNC to synchronize access to eSE
-     *         HAL_NFC_INHIBIT_PWR_CNTRL to disable eSE power
-     *         HAL_NFC_SET_SPM_PWR to toggle eSE power
-     * @return output data as stream of bytes
-     */
-    ioctl(uint64_t ioctlType,NfcData inputData) generates(NfcData outputData);
-};
+#pragma once
+
+enum ErrorType { UNKNOWN, NCI_TIMEOUT, ERROR_NTF, AID_OVERFLOW };

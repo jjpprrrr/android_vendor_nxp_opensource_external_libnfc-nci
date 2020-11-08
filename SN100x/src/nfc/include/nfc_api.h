@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 /******************************************************************************
@@ -55,11 +55,11 @@
 #if (NXP_EXTNS == TRUE)
 #define NXP_EN_SN110U    1
 #define NXP_EN_SN100U    1
-#define NXP_ANDROID_VER (10U)        /* NXP android version */
-#define NFC_NXP_MW_VERSION_MAJ (0x00) /* MW Major Version */
-#define NFC_NXP_MW_VERSION_MIN (0x0A) /* MW Minor Version */
+#define NXP_ANDROID_VER (11U)        /* NXP android version */
+#define NFC_NXP_MW_VERSION_MAJ (0x02) /* MW Major Version */
+#define NFC_NXP_MW_VERSION_MIN (0x00) /* MW Minor Version */
 #define NFC_NXP_MW_CUSTOMER_ID (0x00) /* MW Customer Id */
-#define NFC_NXP_MW_RC_VERSION  (0x01) /* MW RC Version */
+#define NFC_NXP_MW_RC_VERSION  (0x00) /* MW RC Version */
 #define NFC_EE_DISC_OP_REMOVE 1
 #endif
 /* NFC application return status codes */
@@ -144,7 +144,8 @@ typedef uint8_t tNFC_STATUS;
 #define NFC_NORMAL_BOOT_MODE 0
 #define NFC_FAST_BOOT_MODE 1
 #define NFC_OSU_BOOT_MODE 2
-#define UICC1_HOST ((unsigned char)0x02)
+#define NFC_MINIMUM_BOOT_MODE 3
+#define UICC1_HOST ((unsigned char)0x80)
 #define UICC2_HOST ((unsigned char)0x81)
 #define DH_HOST ((unsigned char)0x00)
 #define ESE_HOST ((unsigned char)0xC0)
@@ -163,7 +164,9 @@ typedef uint8_t tNFC_STATUS;
  * NFC Config Parameter IDs defined by NXP NFC
  **********************************************/
 #define NXP_NFC_SET_CONFIG_PARAM_EXT \
-  ((unsigned char)0xA0) /* NXP NFC set config extension ID*/
+  ((unsigned char)0xA0) /* NXP NFC set config extension ID 0*/
+#define NXP_NFC_SET_CONFIG_PARAM_EXT_ID1 \
+  ((unsigned char)0xA1) /* NXP NFC set config extension ID 1*/
 #define NXP_NFC_PARAM_ID_SWP1                \
   ((unsigned char)0xEC) /* SWP1 parameter ID \
                            UICC*/

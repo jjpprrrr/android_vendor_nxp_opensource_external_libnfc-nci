@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -166,6 +166,8 @@ typedef struct {
 
 extern tNfc_featureList nfcFL;
 
+#define FEATURE_SECURE_READER
+
 #define CONFIGURE_FEATURELIST(chipType) {                                   \
         nfcFL.chipType = chipType;                                          \
         if(chipType == pn81T) {                                             \
@@ -216,7 +218,7 @@ extern tNfc_featureList nfcFL;
         if ((chipType == sn100u)) {                                         \
             CONFIGURE_FEATURELIST_NFCC(sn100u)                              \
             nfcFL.nfccFL._NFCC_SPI_FW_DOWNLOAD_SYNC = true;                 \
-            nfcFL.nfccFL._NFA_EE_MAX_EE_SUPPORTED = 4;                      \
+            nfcFL.nfccFL._NFA_EE_MAX_EE_SUPPORTED = 5;                      \
             \
             \
             nfcFL.eseFL._NCI_NFCEE_PWR_LINK_CMD = true;                     \

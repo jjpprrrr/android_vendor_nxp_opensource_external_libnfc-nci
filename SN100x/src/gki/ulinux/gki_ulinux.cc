@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2019 NXP
+ *  Copyright 2019-2020 NXP
  *
  ******************************************************************************/
 #include <errno.h>
@@ -140,8 +140,6 @@ void* gki_task_entry(void* params) {
 void GKI_init(void) {
   pthread_mutexattr_t attr;
   tGKI_OS* p_os;
-
-  memset(&gki_cb, 0, sizeof(gki_cb));
 
   gki_buffer_init();
   gki_timers_init();
@@ -316,14 +314,18 @@ void GKI_shutdown(void) {
   for (task_id = GKI_MAX_TASKS; task_id > 0; task_id--) {
     if (gki_cb.com.OSRdyTbl[task_id - 1] != TASK_DEAD) {
       gki_cb.com.OSRdyTbl[task_id - 1] = TASK_DEAD;
-
       /* paranoi settings, make sure that we do not execute any mailbox events
        */
       gki_cb.com.OSWaitEvt[task_id - 1] &=
           ~(TASK_MBOX_0_EVT_MASK | TASK_MBOX_1_EVT_MASK | TASK_MBOX_2_EVT_MASK |
             TASK_MBOX_3_EVT_MASK);
       GKI_send_event(task_id - 1, EVENT_MASK(GKI_SHUTDOWN_EVT));
-
+#if (NXP_EXTNS == TRUE)
+      if (((task_id - 1) == BTU_TASK)) {
+        gki_cb.com.system_tick_running = false;
+        *p_run_cond = GKI_TIMER_TICK_STOP_COND;
+      }
+#endif
 #if (FALSE == GKI_PTHREAD_JOINABLE)
       i = 0;
 
@@ -496,6 +498,14 @@ void GKI_run(__attribute__((unused)) void* p_task_id) {
        */
       GKI_timer_update(1);
     } while (GKI_TIMER_TICK_RUN_COND == *p_run_cond);
+
+#if(NXP_EXTNS == TRUE)
+    /* when stop condition is set & state is set to
+     * dead shall clear wait event to avoid delay*/
+    if(gki_cb.com.OSRdyTbl[BTU_TASK] == TASK_DEAD) {
+      gki_cb.com.OSWaitEvt[BTU_TASK] = 0;
+    }
+#endif
 
 /* currently on reason to exit above loop is no_timer_suspend ==
  * GKI_TIMER_TICK_STOP_COND

@@ -31,7 +31,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2018-2019 NXP
+ *  Copyright 2018-2020 NXP
  *
  ******************************************************************************/
 
@@ -51,7 +51,9 @@
 #include "nfc_target.h"
 #include "rw_api.h"
 #include "tags_defs.h"
-
+#if (NXP_EXTNS == TRUE)
+#include <stdio.h>
+#endif
 /*****************************************************************************
 **  Constants and data types
 *****************************************************************************/
@@ -165,6 +167,7 @@ typedef uint8_t tNFA_TECHNOLOGY_MASK;
 #define NFA_NORMAL_BOOT_MODE NFC_NORMAL_BOOT_MODE
 #define NFA_FAST_BOOT_MODE NFC_FAST_BOOT_MODE
 #define NFA_OSU_BOOT_MODE NFC_OSU_BOOT_MODE
+#define NFA_MINIMUM_BOOT_MODE NFC_MINIMUM_BOOT_MODE
 
 #define NFA_MAX_NUM_PROTOCOLS 8
 #endif

@@ -29,7 +29,7 @@
 *  See the License for the specific language governing permissions and
 *  limitations under the License.
 *
-*  Copyright 2019 NXP
+*  Copyright 2020 NXP
 *
 ******************************************************************************/
 #pragma once
@@ -67,17 +67,10 @@ namespace vendor {
 namespace nxp {
 namespace hardware {
 namespace nfc {
-namespace V1_0 {
+namespace V2_0 {
 struct INqNfc;
 } } } } }
 
-namespace vendor {
-namespace nxp {
-namespace hardware {
-namespace nfc {
-namespace V1_1 {
-struct INqNfc;
-} } } } }
 typedef void(tNFC_JNI_FWSTATUS_CBACK)(uint8_t status);
 #endif
 class NfcDeathRecipient;
@@ -136,13 +129,16 @@ class NfcAdaptation {
 #endif
   void GetVendorConfigs(std::map<std::string, ConfigValue>& configMap);
 #if (NXP_EXTNS == TRUE)
-  void GetNxpConfigs(std::map<std::string, ConfigValue>& configMap);
   void NFA_SetBootMode(uint8_t boot_mode);
   uint8_t NFA_GetBootMode();
+  string HalGetProperty(string key);
+  bool HalSetProperty(string key, string value);
+  string propVal;
 #endif
+  static bool resetEse(uint64_t level);
   void Dump(int fd);
 #if (NXP_EXTNS == TRUE)
-  nfc_nci_IoctlInOutData_t* mCurrentIoctlData;
+
   tNFC_JNI_FWSTATUS_CBACK* p_fwupdate_status_cback;
 #endif
  private:
@@ -159,12 +155,14 @@ class NfcAdaptation {
   static android::sp<android::hardware::nfc::V1_0::INfc> mHal;
   static android::sp<android::hardware::nfc::V1_1::INfc> mHal_1_1;
   static android::sp<android::hardware::nfc::V1_2::INfc> mHal_1_2;
-  static android::sp<vendor::nxp::hardware::nfc::V1_0::INqNfc> mNqHal;
-  static android::sp<vendor::nxp::hardware::nfc::V1_1::INqNfc> mNqHal_1_1;
+  static android::sp<vendor::nxp::hardware::nfc::V2_0::INqNfc> mNqHal_2_0;
   static android::hardware::nfc::V1_1::INfcClientCallback* mCallback;
   static tHAL_NFC_CBACK* mHalCallback;
   static tHAL_NFC_DATA_CBACK* mHalDataCallback;
   static ThreadCondVar mHalOpenCompletedEvent;
+#if (NXP_EXTNS == TRUE)
+  static ThreadCondVar mHalDataCallbackEvent;
+#endif
   static ThreadCondVar mHalCloseCompletedEvent;
   static android::sp<NfcDeathRecipient> mDeathRecipient;
 
@@ -184,8 +182,8 @@ class NfcAdaptation {
                                  uint8_t* p_core_init_rsp_params);
   static void HalWrite(uint16_t data_len, uint8_t* p_data);
 #if (NXP_EXTNS == TRUE)
-  static int HalIoctl(long arg, void* p_data);
-  static int HalIoctlIntf(long arg, void* p_data);
+
+  static void HalWriteIntf(uint16_t data_len, uint8_t* p_data);
 #endif
   static bool HalPrediscover();
   static void HalControlGranted();
@@ -195,4 +193,6 @@ class NfcAdaptation {
                                           nfc_status_t event_status);
   static void HalDownloadFirmwareDataCallback(uint16_t data_len,
                                               uint8_t* p_data);
+  static bool HalSetTransitConfig(char * strval);
+
 };

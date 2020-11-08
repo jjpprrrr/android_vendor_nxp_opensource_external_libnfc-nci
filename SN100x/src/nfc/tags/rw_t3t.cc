@@ -30,7 +30,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  Copyright 2019 NXP
+ *  Copyright 2019-2020 NXP
  *
  ******************************************************************************/
 
@@ -1340,15 +1340,28 @@ void rw_t3t_act_handle_ndef_detect_rsp(tRW_T3T_CB* p_cb, NFC_HDR* p_msg_rsp) {
             p_cb->ndef_attrib.nbr, p_cb->ndef_attrib.nbw,
             p_cb->ndef_attrib.nmaxb, p_cb->ndef_attrib.writef,
             p_cb->ndef_attrib.rwflag, p_cb->ndef_attrib.ln);
-
-        /* Set data for RW_T3T_NDEF_DETECT_EVT */
-        evt_data.status = p_cb->ndef_attrib.status;
-        evt_data.cur_size = p_cb->ndef_attrib.ln;
-        evt_data.max_size = (uint32_t)p_cb->ndef_attrib.nmaxb * 16;
-        evt_data.protocol = NFC_PROTOCOL_T3T;
-        evt_data.flags = (RW_NDEF_FL_SUPPORTED | RW_NDEF_FL_FORMATED);
-        if (p_cb->ndef_attrib.rwflag == T3T_MSG_NDEF_RWFLAG_RO)
-          evt_data.flags |= RW_NDEF_FL_READ_ONLY;
+        if (p_cb->ndef_attrib.nbr > T3T_MSG_NUM_BLOCKS_CHECK_MAX ||
+            p_cb->ndef_attrib.nbw > T3T_MSG_NUM_BLOCKS_UPDATE_MAX) {
+          /* It would result in CHECK Responses exceeding the maximum length
+           * of an NFC-F Frame */
+          LOG(ERROR) << StringPrintf(
+              "Unsupported NDEF Attributes value: Nbr=%i, Nbw=%i, Nmaxb=%i,"
+              "WriteF=%i, RWFlag=%i, Ln=%i",
+              p_cb->ndef_attrib.nbr, p_cb->ndef_attrib.nbw,
+              p_cb->ndef_attrib.nmaxb, p_cb->ndef_attrib.writef,
+              p_cb->ndef_attrib.rwflag, p_cb->ndef_attrib.ln);
+          p_cb->ndef_attrib.status = NFC_STATUS_FAILED;
+          evt_data.status = NFC_STATUS_BAD_RESP;
+        } else {
+          /* Set data for RW_T3T_NDEF_DETECT_EVT */
+          evt_data.status = p_cb->ndef_attrib.status;
+          evt_data.cur_size = p_cb->ndef_attrib.ln;
+          evt_data.max_size = (uint32_t)p_cb->ndef_attrib.nmaxb * 16;
+          evt_data.protocol = NFC_PROTOCOL_T3T;
+          evt_data.flags = (RW_NDEF_FL_SUPPORTED | RW_NDEF_FL_FORMATED);
+          if (p_cb->ndef_attrib.rwflag == T3T_MSG_NDEF_RWFLAG_RO)
+            evt_data.flags |= RW_NDEF_FL_READ_ONLY;
+        }
       }
     }
   }
@@ -1500,13 +1513,19 @@ void rw_t3t_act_handle_check_ndef_rsp(tRW_T3T_CB* p_cb, NFC_HDR* p_msg_rsp) {
   uint8_t* p_t3t_rsp = (uint8_t*)(p_msg_rsp + 1) + p_msg_rsp->offset;
   uint8_t rsp_num_bytes_rx;
 
-  /* Validate response from tag */
-  if ((p_t3t_rsp[T3T_MSG_RSP_OFFSET_STATUS1] !=
-       T3T_MSG_RSP_STATUS_OK) /* verify response status code */
-      || (memcmp(p_cb->peer_nfcid2, &p_t3t_rsp[T3T_MSG_RSP_OFFSET_IDM],
-                 NCI_NFCID2_LEN) != 0) /* verify response IDm */
-      || (p_t3t_rsp[T3T_MSG_RSP_OFFSET_NUMBLOCKS] !=
-          ((p_cb->ndef_rx_readlen + 15) >> 4))) /* verify length of response */
+  if (p_msg_rsp->len < T3T_MSG_RSP_OFFSET_CHECK_DATA) {
+    LOG(ERROR) << StringPrintf("%s invalid len", __func__);
+    nfc_status = NFC_STATUS_FAILED;
+    GKI_freebuf(p_msg_rsp);
+    android_errorWriteLog(0x534e4554, "120428637");
+    /* Validate response from tag */
+  } else if ((p_t3t_rsp[T3T_MSG_RSP_OFFSET_STATUS1] !=
+              T3T_MSG_RSP_STATUS_OK) /* verify response status code */
+             || (memcmp(p_cb->peer_nfcid2, &p_t3t_rsp[T3T_MSG_RSP_OFFSET_IDM],
+                        NCI_NFCID2_LEN) != 0) /* verify response IDm */
+             || (p_t3t_rsp[T3T_MSG_RSP_OFFSET_NUMBLOCKS] !=
+                 ((p_cb->ndef_rx_readlen + 15) >>
+                  4))) /* verify length of response */
   {
     LOG(ERROR) << StringPrintf(
         "Response error: bad status, nfcid2, or invalid len: %i %i",
@@ -1520,10 +1539,11 @@ void rw_t3t_act_handle_check_ndef_rsp(tRW_T3T_CB* p_cb, NFC_HDR* p_msg_rsp) {
         T3T_MSG_OPC_CHECK_RSP, p_t3t_rsp[T3T_MSG_RSP_OFFSET_RSPCODE]);
     nfc_status = NFC_STATUS_FAILED;
     GKI_freebuf(p_msg_rsp);
-  } else {
+  } else if (p_msg_rsp->len >= T3T_MSG_RSP_OFFSET_CHECK_DATA &&
+             p_t3t_rsp[T3T_MSG_RSP_OFFSET_NUMBLOCKS] > 0) {
     /* Notify app of NDEF segment received */
-    rsp_num_bytes_rx = p_t3t_rsp[T3T_MSG_RSP_OFFSET_NUMBLOCKS] *
-                       16; /* Number of bytes received, according to header */
+    /* Number of bytes received, according to header */
+    rsp_num_bytes_rx = p_t3t_rsp[T3T_MSG_RSP_OFFSET_NUMBLOCKS] * 16;
     p_cb->ndef_rx_offset += p_cb->ndef_rx_readlen;
     p_msg_rsp->offset +=
         T3T_MSG_RSP_OFFSET_CHECK_DATA; /* Skip over t3t header (point to block
@@ -1563,6 +1583,11 @@ void rw_t3t_act_handle_check_ndef_rsp(tRW_T3T_CB* p_cb, NFC_HDR* p_msg_rsp) {
         }
       }
     }
+  } else {
+    android_errorWriteLog(0x534e4554, "120502559");
+    GKI_freebuf(p_msg_rsp);
+    nfc_status = NFC_STATUS_FAILED;
+    LOG(ERROR) << StringPrintf("Underflow in p_msg_rsp->len!");
   }
 
   /* Notify app of RW_T3T_CHECK_CPLT_EVT if entire NDEF has been read, or if
@@ -2173,16 +2198,15 @@ void rw_t3t_data_cback(__attribute__((unused)) uint8_t conn_id,
     LOG(ERROR) << StringPrintf(
         "T3T: invalid Type3 Tag Message (invalid len: %i)", p_msg->len);
     free_msg = true;
-
     rw_t3t_process_frame_error();
   } else {
     /* Check for RF frame error */
     p = (uint8_t*)(p_msg + 1) + p_msg->offset;
     sod = p[0];
-    if (p[sod] != NCI_STATUS_OK) {
-      LOG(ERROR) << StringPrintf("T3T: rf frame error (crc status=%i)", p[sod]);
-      GKI_freebuf(p_msg);
 
+    if (p_msg->len < sod || p[sod] != NCI_STATUS_OK) {
+      LOG(ERROR) << "T3T: rf frame error";
+      GKI_freebuf(p_msg);
       rw_t3t_process_frame_error();
       return;
     }

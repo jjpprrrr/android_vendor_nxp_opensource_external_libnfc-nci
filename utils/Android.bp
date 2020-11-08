@@ -29,6 +29,11 @@ cc_library_static {
     shared_libs: [
         "libbase",
     ],
+    sanitize: {
+        cfi: true,
+        misc_undefined: ["signed-integer-overflow",
+                         "unsigned-integer-overflow"],
+    },
 }
 
 cc_test {
@@ -46,5 +51,19 @@ cc_test {
     ],
     shared_libs: [
         "libbase",
+    ],
+}
+
+cc_fuzz {
+    name: "nqnfc_utils_ringbuffer_fuzzer",
+    host_supported: true,
+    srcs: [
+        "test/ringbuffer_fuzzer/ringbuffer_fuzzer.cpp",
+    ],
+    static_libs: [
+        "libnqnfcutils",
+    ],
+    corpus: [
+        "test/ringbuffer_fuzzer/corpus/*",
     ],
 }
